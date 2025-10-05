@@ -18,4 +18,19 @@ router.post("/send", async (req, res) => {
   res.json({ success: true });
 });
 
+router.get("/status", async (_req, res) => {
+  const sock = getSocket();
+  const voiceBridgeUrl = process.env.VOICE_BRIDGE_URL || "http://localhost:3001";
+  
+  res.json({
+    whatsapp: {
+      connected: !!sock,
+      status: sock ? "connected" : "disconnected"
+    },
+    voiceBridge: {
+      url: voiceBridgeUrl
+    }
+  });
+});
+
 export default router;
