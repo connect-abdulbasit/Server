@@ -53,16 +53,35 @@ export class TranscriptionService {
       await fs.writeFile(tempFilePath, audioBuffer);
       console.log(`💾 Saved audio to temporary file: ${tempFilePath}`);
       
+      // Debug: Check file size and content
+      const stats = await fs.stat(tempFilePath);
+      console.log(`📊 File stats: ${stats.size} bytes`);
+      
+      // Check if file is too small (likely corrupted or empty)
+      if (stats.size < 1000) {
+        console.warn(`⚠️ Audio file seems too small: ${stats.size} bytes`);
+        return "I couldn't understand the audio message.";
+      }
+      
       try {
-        // Transcribe using AssemblyAI
+        // Transcribe using AssemblyAI with enhanced settings
         const transcript = await this.client.transcripts.transcribe({
           audio: tempFilePath,
-          speech_model: "universal", // Use universal model for better accuracy
+          speech_model: "universal",
+          language_detection: true, // Enable automatic language detection
+          punctuate: true, // Add punctuation
+          format_text: true, // Format the text
         });
         
         console.log(`📝 Transcription completed: "${transcript.text}"`);
         
-        return transcript.text || "I couldn't understand the audio message.";
+        // Check if transcription is empty or too short
+        if (!transcript.text || transcript.text.trim().length < 2) {
+          console.warn(`⚠️ Transcription is empty or too short: "${transcript.text}"`);
+          return "I couldn't understand the audio message.";
+        }
+        
+        return transcript.text;
         
       } finally {
         // Clean up temporary file
@@ -114,6 +133,14 @@ export class TranscriptionService {
     try {
       console.log(`🎙️ Downloading WhatsApp audio message...`);
       
+      // Debug: Log message structure
+      console.log(`📊 Message structure:`, {
+        hasMessage: !!message.message,
+        hasAudioMessage: !!message.message?.audioMessage,
+        audioMessageKeys: message.message?.audioMessage ? Object.keys(message.message.audioMessage) : [],
+        messageKeys: Object.keys(message)
+      });
+      
       // Download the audio file from WhatsApp using the correct Baileys method
       const audioBuffer = await downloadMediaMessage(
         message,
@@ -128,9 +155,22 @@ export class TranscriptionService {
       
       console.log(`📥 Downloaded audio (${audioBuffer.length} bytes)`);
       
+      // Debug: Check audio buffer content
+      if (audioBuffer.length < 1000) {
+        console.warn(`⚠️ Downloaded audio is very small: ${audioBuffer.length} bytes`);
+        console.log(`📊 First 20 bytes:`, audioBuffer.slice(0, 20));
+      }
+      
       // Get the mimetype from the audio message
       const audioMessage = message.message?.audioMessage;
       const mimetype = audioMessage?.mimetype || 'audio/ogg; codecs=opus';
+      
+      console.log(`🎵 Audio message details:`, {
+        mimetype: mimetype,
+        duration: audioMessage?.seconds,
+        ptt: audioMessage?.ptt,
+        fileLength: audioMessage?.fileLength
+      });
       
       // Transcribe the audio
       return await this.transcribeVoiceMessage(audioBuffer, mimetype);
