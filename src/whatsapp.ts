@@ -24,8 +24,24 @@ import makeWASocket, {
       if (connection === "close") {
         const shouldReconnect =
           (lastDisconnect?.error as any)?.output?.statusCode !== DisconnectReason.loggedOut;
+        
+        // Check if it's a conflict error (multiple sessions)
+        const isConflict = lastDisconnect?.error?.message?.includes('conflict') || 
+                          (lastDisconnect?.error as any)?.output?.statusCode === 409;
+        
+        if (isConflict) {
+          console.log("⚠️ Multiple WhatsApp sessions detected. Please:");
+          console.log("   1. Close WhatsApp Web in your browser");
+          console.log("   2. Wait 30 seconds");
+          console.log("   3. Restart the server");
+          return; // Don't reconnect on conflict
+        }
+        
         console.log("Connection closed. Reconnecting:", shouldReconnect);
-        if (shouldReconnect) connectToWhatsApp();
+        if (shouldReconnect) {
+          // Add delay before reconnecting to avoid rapid reconnection
+          setTimeout(() => connectToWhatsApp(), 5000);
+        }
       } else if (connection === "open") {
         console.log("✅ WhatsApp connected!");
       }
